@@ -5,18 +5,22 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
-from pushover_complete import PushoverAPI
 from tenacity import retry, stop_after_attempt, wait_fixed
 import os
 import time
 import json
 import argparse
 import logging
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from requests.exceptions import RequestException
 
-# Use environment variables for Pushover credentials
-PUSHOVER_USER_KEY = os.environ.get('PUSHOVER_USER_KEY')
-PUSHOVER_API_TOKEN = os.environ.get('PUSHOVER_API_TOKEN')
+# Email configuration
+SENDER_EMAIL = "aidanlkimberley@gmail.com"
+RECIPIENT_EMAIL = "aidan.kimberley@mail.mcgill.ca"
+# You'll need to set this environment variable with your Gmail app password
+GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -45,13 +49,34 @@ def load_webpage(driver, url):
     logging.info("Webpage loaded successfully.")
 
 def send_notification(title, message):
-    # Send push notification using Pushover API
+    # Send email notification using Gmail SMTP
+    if not GMAIL_APP_PASSWORD:
+        logging.error("GMAIL_APP_PASSWORD environment variable not set. Cannot send email.")
+        return
+    
     try:
-        pushover = PushoverAPI(PUSHOVER_API_TOKEN)
-        pushover.send_message(PUSHOVER_USER_KEY, message, title=title)
-        logging.info(f"Notification sent: {title}")
+        # Create message
+        msg = MIMEMultipart()
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = RECIPIENT_EMAIL
+        msg['Subject'] = title
+        
+        # Add body to email
+        msg.attach(MIMEText(message, 'plain'))
+        
+        # Create SMTP session
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, GMAIL_APP_PASSWORD)
+        
+        # Send email
+        text = msg.as_string()
+        server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, text)
+        server.quit()
+        
+        logging.info(f"Email notification sent: {title}")
     except Exception as e:
-        logging.error(f"Failed to send notification: {str(e)}")
+        logging.error(f"Failed to send email notification: {str(e)}")
 
 def scroll_to_element(driver, element):
     # Scroll to the specified element to ensure it's in view
@@ -100,13 +125,31 @@ def get_course_availability(driver, course):
 
 def setup_driver():
     # Configure and initialize Chrome WebDriver
+    from webdriver_manager.chrome import ChromeDriverManager
+    from selenium.webdriver.chrome.service import Service
+    
     chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--window-size=800,1080')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
     
-    driver = webdriver.Chrome(options=chrome_options)
+    try:
+        # Try with a specific ChromeDriver version
+        service = Service(ChromeDriverManager(version="114.0.5735.90").install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+    except Exception as e:
+        logging.warning(f"Failed to use webdriver-manager: {e}")
+        try:
+            # Fallback to system Chrome
+            driver = webdriver.Chrome(options=chrome_options)
+        except Exception as e2:
+            logging.error(f"Failed to initialize Chrome driver: {e2}")
+            raise
+    
     return driver
 
 def perform_web_task():
