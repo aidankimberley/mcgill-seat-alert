@@ -187,9 +187,48 @@ def perform_web_task():
         # Navigate to the course selection page
         load_webpage(driver, "https://vsb.mcgill.ca/vsb/criteria.jsp?access=0&lang=en&tip=1&page=results&scratch=0&term=0&sort=none&filters=iiiiiiiii&bbs=&ds=&cams=Distance_Downtown_Macdonald_Off-Campus&locs=any&isrts=&course_0_0=&sa_0_0=&cs_0_0=--+All+--&cpn_0_0=&csn_0_0=&ca_0_0=&dropdown_0_0=al&ig_0_0=0&rq_0_0=")
         
+        # Debug: Log page info
+        logging.info(f"Current URL: {driver.current_url}")
+        logging.info(f"Page title: {driver.title}")
+        logging.info("Page loaded, waiting 3 seconds for elements to load...")
+        time.sleep(3)
+        
         # Click the Continue button
         logging.info("Looking for Continue button...")
-        continue_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, "//input[@type='button' and @value='Continue']")))
+        
+        # Try multiple possible selectors for the Continue button
+        continue_button = None
+        selectors = [
+            "//input[@type='button' and @value='Continue']",
+            "//input[@value='Continue']",
+            "//button[contains(text(), 'Continue')]",
+            "//input[@type='submit' and @value='Continue']",
+            "//a[contains(text(), 'Continue')]"
+        ]
+        
+        for selector in selectors:
+            try:
+                logging.info(f"Trying selector: {selector}")
+                continue_button = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, selector)))
+                logging.info(f"Found Continue button with selector: {selector}")
+                break
+            except TimeoutException:
+                logging.info(f"Selector failed: {selector}")
+                continue
+        
+        if continue_button is None:
+            logging.error("Could not find Continue button with any selector")
+            logging.info("Available buttons on page:")
+            buttons = driver.find_elements(By.TAG_NAME, "input")
+            for button in buttons:
+                try:
+                    value = button.get_attribute("value")
+                    button_type = button.get_attribute("type")
+                    logging.info(f"Button - type: {button_type}, value: {value}")
+                except:
+                    pass
+            raise TimeoutException("Continue button not found")
+        
         logging.info("Found Continue button, scrolling to it...")
         scroll_to_element(driver, continue_button)
         logging.info("Clicking Continue button...")
