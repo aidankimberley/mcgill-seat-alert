@@ -14,7 +14,7 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from requests.exceptions import RequestException
+
 
 # Email configuration
 SENDER_EMAIL = "aidanlkimberley@gmail.com"
