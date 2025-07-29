@@ -188,14 +188,20 @@ def perform_web_task():
         load_webpage(driver, "https://vsb.mcgill.ca/vsb/criteria.jsp?access=0&lang=en&tip=1&page=results&scratch=0&term=0&sort=none&filters=iiiiiiiii&bbs=&ds=&cams=Distance_Downtown_Macdonald_Off-Campus&locs=any&isrts=&course_0_0=&sa_0_0=&cs_0_0=--+All+--&cpn_0_0=&csn_0_0=&ca_0_0=&dropdown_0_0=al&ig_0_0=0&rq_0_0=")
         
         # Click the Continue button
+        logging.info("Looking for Continue button...")
         continue_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, "//input[@type='button' and @value='Continue']")))
+        logging.info("Found Continue button, scrolling to it...")
         scroll_to_element(driver, continue_button)
+        logging.info("Clicking Continue button...")
         continue_button.click()
         logging.info("Clicked the Continue button.")
 
         # Select the desired term
+        logging.info(f"Looking for term button with data-term='{term}'...")
         term_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, f"//input[@name='radterm' and @data-term='{term}']")))
+        logging.info("Found term button, scrolling to it...")
         scroll_to_element(driver, term_button)
+        logging.info("Clicking term button...")
         term_button.click()
         logging.info(f"Selected term: {term}")
 
@@ -262,6 +268,17 @@ def perform_web_task():
         logging.info("All courses have been checked for availability.")
     except Exception as e:
         logging.error(f"An error occurred during web task: {str(e)}")
+        logging.error(f"Error type: {type(e).__name__}")
+        logging.error(f"Full error details: {repr(e)}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        try:
+            logging.error(f"Current page URL: {driver.current_url}")
+            logging.error(f"Page title: {driver.title}")
+            logging.error("Page source (first 1000 chars):")
+            logging.error(driver.page_source[:1000])
+        except Exception as dump_error:
+            logging.error(f"Could not dump page info: {dump_error}")
     finally:
         driver.quit()
 
