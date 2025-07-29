@@ -52,9 +52,15 @@ def send_notification(title, message):
     # Send email notification using Gmail SMTP
     if not GMAIL_APP_PASSWORD:
         logging.error("GMAIL_APP_PASSWORD environment variable not set. Cannot send email.")
+        logging.info("EMAIL RESULT: FAILED - No Gmail app password configured")
         return
     
     try:
+        logging.info("Starting email notification process...")
+        logging.info(f"From: {SENDER_EMAIL}")
+        logging.info(f"To: {RECIPIENT_EMAIL}")
+        logging.info(f"Subject: {title}")
+        
         # Create message
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
@@ -65,18 +71,23 @@ def send_notification(title, message):
         msg.attach(MIMEText(message, 'plain'))
         
         # Create SMTP session
+        logging.info("Connecting to Gmail SMTP server...")
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
+        logging.info("Authenticating with Gmail...")
         server.login(SENDER_EMAIL, GMAIL_APP_PASSWORD)
         
         # Send email
+        logging.info("Sending email...")
         text = msg.as_string()
         server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, text)
         server.quit()
         
-        logging.info(f"Email notification sent: {title}")
+        logging.info(f"Email notification sent successfully: {title}")
+        logging.info("EMAIL RESULT: SUCCESS - Email sent successfully")
     except Exception as e:
         logging.error(f"Failed to send email notification: {str(e)}")
+        logging.info("EMAIL RESULT: FAILED - Email sending failed")
 
 def scroll_to_element(driver, element):
     # Scroll to the specified element to ensure it's in view
@@ -104,30 +115,34 @@ def get_course_availability(driver, course):
                 if "Lec" in section.text:
                     # Extract CRN and check for open seats or waitlist availability
                     crn = section.find_element(By.XPATH, ".//span[@class='crn_value']").text
+                    logging.info(f"Checking CRN {crn} for course {course}")
                     
                     seats_element = section.find_element(By.XPATH, ".//span[contains(@class, 'leftnclear') and contains(., 'Seats:')]")
                     if "Full" not in seats_element.text:
                         available_sections.append((crn, "Open seats"))
+                        logging.info(f"Course {course} - CRN {crn}: OPEN SEATS AVAILABLE")
                         continue
                     
                     waitlist_element = section.find_element(By.XPATH, ".//span[contains(@class, 'legend_waitlist')]")
                     if "None" not in waitlist_element.text:
                         available_sections.append((crn, "Waitlist"))
+                        logging.info(f"Course {course} - CRN {crn}: WAITLIST AVAILABLE")
+                    else:
+                        logging.info(f"Course {course} - CRN {crn}: FULL (no waitlist)")
             except NoSuchElementException as e:
                 logging.warning(f"Error processing section in {course}: {str(e)}")
         
         return available_sections
     except TimeoutException:
         logging.error(f"Timeout while searching for course: {course}")
+        logging.info(f"Course {course}: NOT FOUND (timeout)")
     except Exception as e:
         logging.error(f"Error checking availability for {course}: {str(e)}")
+        logging.info(f"Course {course}: ERROR - {str(e)}")
     return []
 
 def setup_driver():
     # Configure and initialize Chrome WebDriver
-    from webdriver_manager.chrome import ChromeDriverManager
-    from selenium.webdriver.chrome.service import Service
-    
     chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
@@ -136,19 +151,16 @@ def setup_driver():
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--remote-debugging-port=9222')
     
     try:
-        # Try with a specific ChromeDriver version
-        service = Service(ChromeDriverManager(version="114.0.5735.90").install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        # Use system ChromeDriver (already set up by GitHub Actions)
+        driver = webdriver.Chrome(options=chrome_options)
+        logging.info("Chrome driver initialized successfully")
     except Exception as e:
-        logging.warning(f"Failed to use webdriver-manager: {e}")
-        try:
-            # Fallback to system Chrome
-            driver = webdriver.Chrome(options=chrome_options)
-        except Exception as e2:
-            logging.error(f"Failed to initialize Chrome driver: {e2}")
-            raise
+        logging.error(f"Failed to initialize Chrome driver: {e}")
+        raise
     
     return driver
 
@@ -236,9 +248,16 @@ def perform_web_task():
                 notification_body += f"{course}:\n"
                 for crn, availability_type in sections:
                     notification_body += f"  CRN: {crn}, Availability: {availability_type}\n"
+            
+            logging.info("=== EMAIL NOTIFICATION STATUS ===")
+            logging.info("Courses found available - attempting to send email notification...")
             send_notification(notification_title, notification_body)
+            logging.info("Email notification process completed.")
+            logging.info("=== END EMAIL STATUS ===")
         else:
-            logging.info("No courses are currently available.")
+            logging.info("=== EMAIL NOTIFICATION STATUS ===")
+            logging.info("No courses are currently available - no email notification sent.")
+            logging.info("=== END EMAIL STATUS ===")
 
         logging.info("All courses have been checked for availability.")
     except Exception as e:
