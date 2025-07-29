@@ -203,7 +203,9 @@ def perform_web_task():
             "//input[@value='Continue']",
             "//button[contains(text(), 'Continue')]",
             "//input[@type='submit' and @value='Continue']",
-            "//a[contains(text(), 'Continue')]"
+            "//a[contains(text(), 'Continue')]",
+            "//input[contains(@value, 'Continue')]",
+            "//button[contains(@value, 'Continue')]"
         ]
         
         for selector in selectors:
@@ -227,7 +229,15 @@ def perform_web_task():
                     logging.info(f"Button - type: {button_type}, value: {value}")
                 except:
                     pass
-            raise TimeoutException("Continue button not found")
+            
+            # Try to find the Continue button by looking for any element with "Continue" text
+            logging.info("Trying to find Continue button by text content...")
+            try:
+                continue_button = driver.find_element(By.XPATH, "//*[contains(text(), 'Continue')]")
+                logging.info("Found Continue button by text content")
+            except:
+                logging.error("Could not find Continue button by text content either")
+                raise TimeoutException("Continue button not found")
         
         logging.info("Found Continue button, scrolling to it...")
         scroll_to_element(driver, continue_button)
